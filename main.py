@@ -1,0 +1,6 @@
+name = input("enter your name: ")
+print(f"Nice to meet you, {name}!")
+age_input = input("how old are you: ")
+age = int(age_input)
+color = input("whats your favorite color? ")
+print(f"oh, {color} is a beautiful color")
