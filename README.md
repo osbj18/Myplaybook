@@ -1,211 +1,71 @@
 ---
 
-## Transaktionsanalys (transaction_analyzer.py)
+def print_summary(transactions):
+def create_summary(name, amount, food_type):
+---
+
+# Myplaybook
+
+En samling enkla Python-program för olika ändamål. Nedan hittar du beskrivning, instruktioner och exempel för varje program.
+
+---
+
+## Transaktionsanalys (transaktion_analys.py)
 
 Ett program för att analysera och summera ekonomiska transaktioner, inklusive insättningar, uttag och statistik.
 
 ### Så här kör du programmet:
 
 ```bash
-python transaction_analyzer.py
+python transaktion_analys.py
 ```
 
-### Exempel på användning
+---
 
-```text
-Choose between print, analyze or stop: print
-3244.06
--2071.69
-Balance: 1172.37
-Choose between print, analyze or stop: analyze
-Largest withdrawal: (-881.51, 'Utilities')
-Largest deposit: (981.17, 'Investment Return')
-Average deposit: 463.4371428571428
-Average withdrawal: -295.9557142857143
-Choose between print, analyze or stop: stop
-Program ended.
-```
+## Kortdragare (kortdragare.py)
 
-### Kodexempel
+Ett program där du kan dra valfritt antal kort från en blandad kortlek och se dem visuellt i terminalen.
 
-```python
-data = [
-  (749.17, "Investment Return"),
-  (-11.54, "Utilities"),
-  (-247.58, "Online Shopping"),
-  (981.17, "Investment Return"),
-  (-410.65, "Rent"),
-  (310.60, "Rent"),
-  (563.70, "Gift"),
-  (220.79, "Salary"),
-  (-49.85, "Car Maintenance"),
-  (308.49, "Salary"),
-  (-205.55, "Car Maintenance"),
-  (870.64, "Salary"),
-  (-881.51, "Utilities"),
-  (518.14, "Salary"),
-  (-264.66, "Groceries")
-]
-
-def print_transactions(transactions):
-	for amount, statement in transactions:
-		print(f"${amount}, {statement}")
-
-print_transactions(data)
-
-def print_summary(transactions):
-	deposits = [transaction[0] for transaction in transactions if transaction[0] >= 0]
-		print("Invalid choice")
 ### Så här kör du programmet:
-Welcome to the Food Order System!
-Curry
-## Kortdragare (card_drawer.py)
 
-	Det här avsnittet gäller programmet för att dra kort ur en kortlek.
+```bash
+python kortdragare.py
+```
 
-	**Filnamn:** `card_drawer.py`
+---
 
-	Ett program där du kan dra valfritt antal kort från en blandad kortlek och se dem visuellt i terminalen.
+## Matorder (matorder.py)
 
-	### Så här kör du programmet:
+Ett menyprogram där du kan välja mellan italiensk och indisk mat, se tillgängliga rätter och lägga en beställning.
 
-	```bash
-	python card_drawer.py
-	```
+### Så här kör du programmet:
 
-	### Exempel på användning
+```bash
+python matorder.py
+```
 
-	```text
-	How many cards do you want to draw?: 2
-		+-------+
-		|A      |
-		|       |
-		|   ♠   |
-		|       |
-		|      A|
-		+-------+
-		+-------+
-		|10     |
-		|       |
-		|   ♥   |
-		|       |
-		|     10|
-		+-------+
-	```
+---
 
-	### Kodexempel
+## Sten, sax, påse (sten_sax_pase.py)
 
-	```python
-	import random
+Ett enkelt spel där du möter datorn i sten, sax eller påse – bäst av 3!
 
-		return None
-		suits = ["♥", "♦", "♣", "♠"]
-		ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
-		deck = []
-		for suit in suits:
-			for rank in ranks:
-				deck.append((suit, rank))
-		return deck
+### Så här kör du spelet:
 
+```bash
+python sten_sax_pase.py
+```
 
-		hand = []
-		for _ in range(number_of_cards):
-			if deck:
-				hand.append(deck.pop())
-			else:
-				break
-		return hand, deck
+---
 
-def display_available_meals(food_type):
-	random.shuffle(deck)
+## ToDo-lista (todo_lista.py)
 
-	if food_type == "Italian":
-		space = " "
-		if len(card[1]) == 2:
-			space = ""
-		print (f"""
-		+-------+
-		|{card[1]}     {space}|
-		|       |
-		|   {card[0]}   |
-		|       |
-		|{space}     {card[1]}|
-		+-------+""")
+Ett enkelt program för att hantera en att-göra-lista i terminalen.
 
-	while len(deck) > 0:
-		num_cards = int(input("How many cards do you want to draw?: "))
-		if num_cards > len(deck):
-			break
-		else:
-			hand, deck = draw_card(deck, num_cards)
-			for card in hand:
-				show_card(card)
+### Så här kör du programmet:
 
-	print("We are out of cards!")
-	```
-		print("Available Italian Meals: ")
-		for meals in italian_food:
-			---
-
-			## Kortdragare (card_drawer.py)
-
-			Ett program där du kan dra valfritt antal kort från en blandad kortlek och se dem visuellt i terminalen.
-
-			### Så här kör du programmet:
-
-			```bash
-			python card_drawer.py
-			```
-
-			### Exempel på användning
-
-			```text
-			How many cards do you want to draw?: 2
-				+-------+
-				|A      |
-				|       |
-				|   ♠   |
-				|       |
-				|      A|
-				+-------+
-				+-------+
-				|10     |
-				|       |
-				|   ♥   |
-				|       |
-				|     10|
-				+-------+
-			```
-
-			### Kodexempel
-
-			```python
-			import random
-
-			print(meals)
-	elif food_type == "Indian":
-		print("Available Indian Meals: ")
-		for meals in indian_food:
-			print(meals)
-	else:
-		print("Invalid food type")
-
-def create_summary(name, amount, food_type):
-	order = select_meal(name, food_type)
-	if order:
-		return (f"You ordered {amount} of {name}!")
-	else: 
-		return ("Meal not found")
-
-print("Welcome to the Food Order System!")
-
-type_input = input("What type of food do you want to choose from, Italian or Indian?: ")
-display_available_meals(type_input)
-name_input = input("Choose your meal: ")
-amount_input = input("How many of them do you want?: ")
-
-result = create_summary(name_input, amount_input, type_input)
-print(result)
+```bash
+python todo_lista.py
 ```
 ---
 
