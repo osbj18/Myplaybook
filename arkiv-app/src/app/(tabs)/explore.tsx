@@ -1,89 +1,126 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { router, useIsFocused } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '../../components/Icon';
-import { IconBtn, Img, Logo, TopBar } from '../../components/ui';
-import { ME, type Sale } from '../../data/seed';
-import { kr, useStore } from '../../store';
+import { openItem } from '../../components/items';
+import { MediaView, VideoBadge } from '../../components/MediaView';
+import { Avatar, Empty, IconBtn, Loading, Logo, TopBar } from '../../components/ui';
+import { kr, useExplore, useMyBlocks, useMySaves, useToggleSave, type ExploreFilter } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
+import { toast } from '../../lib/toast';
 import { C } from '../../theme';
 
-const FILTERS = ['Märke', 'Storlek', 'Skick', 'Färg', 'Pris'] as const;
-type Filter = (typeof FILTERS)[number];
-const HINT: Record<Filter, string> = { Märke: 'A–Ö', Storlek: 'M', Skick: 'mycket gott+', Färg: 'neutrala', Pris: 'lägst först' };
+const SIZES = ['XS', 'S', 'M', 'L', 'XL'];
+const CONDS = ['Ny med lapp', 'Mycket gott skick', 'Gott skick', 'Använt'];
 
 export default function Explore() {
-  const { state, toggleHeart, toast } = useStore();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<Filter | null>(null);
+  const focused = useIsFocused();
+  const { userId } = useAuth();
+  const [input, setInput] = useState('');
+  const [f, setF] = useState<ExploreFilter>({ q: '', sort: 'new' });
+  const [open, setOpen] = useState<'size' | 'cond' | null>(null);
+  const res = useExplore(f);
+  const saves = useMySaves();
+  const toggleSave = useToggleSave();
+  const blocks = useMyBlocks();
   const colW = (width - 36 - 13) / 2;
 
-  const list = useMemo(() => {
-    let l = state.items.filter((x): x is Sale => x.kind === 'sale' && x.owner !== ME && !x.sold && !state.blocked[x.owner]);
-    const query = q.trim().toLowerCase();
-    if (query) l = l.filter((x) => [x.brand, x.title, x.owner, x.color].join(' ').toLowerCase().includes(query));
-    else l = [...l.filter((x) => x.explore), ...l.filter((x) => !x.explore)];
-    if (filter === 'Pris') l = [...l].sort((a, b) => a.price - b.price);
-    if (filter === 'Skick') l = l.filter((x) => /Ny|Mycket/.test(x.cond));
-    if (filter === 'Storlek') l = l.filter((x) => ['M', 'One size'].includes(x.size));
-    if (filter === 'Märke') l = [...l].sort((a, b) => a.brand.localeCompare(b.brand, 'sv'));
-    if (filter === 'Färg') l = l.filter((x) => /Svart|Grå|Beige|Sand|Natur/.test(x.color));
-    return l;
-  }, [state.items, state.blocked, q, filter]);
+  // Vänta lite med sökningen medan man skriver.
+  useEffect(() => {
+    const t = setTimeout(() => setF((x) => ({ ...x, q: input })), 300);
+    return () => clearTimeout(t);
+  }, [input]);
+
+  const items = (res.data?.items ?? []).filter((x) => !blocks.data?.has(x.owner_id) && x.owner_id !== userId);
+  const people = (res.data?.people ?? []).filter((p) => !blocks.data?.has(p.id) && p.id !== userId);
+
+  const pill = (label: string, on: boolean, onPress: () => void) => (
+    <Pressable key={label} onPress={onPress} style={[styles.filter, on && styles.filterOn]}>
+      <Text style={{ fontSize: 14.5, color: on ? '#fff' : C.ink }}>{label}</Text>
+      <Icon name="chev" size={9} color={on ? '#fff' : C.ink} />
+    </Pressable>
+  );
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: C.bg }}>
       <TopBar
         left={<IconBtn label="Hem" onPress={() => router.navigate('/')}><Icon name="back" /></IconBtn>}
         center={<Logo />}
-        right={<IconBtn label="Notiser" onPress={() => toast('Inga nya notiser')}><Icon name="bell" /></IconBtn>}
+        right={<IconBtn label="Meddelanden" onPress={() => router.navigate('/messages')}><Icon name="bell" /></IconBtn>}
       />
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 24 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 24 }}
+        refreshControl={<RefreshControl refreshing={res.isRefetching} onRefresh={() => { res.refetch(); }} />}
+      >
         <Text style={styles.title}>Upptäck</Text>
         <View style={styles.search}>
           <Icon name="search" size={14} color="#777" />
-          <TextInput value={q} onChangeText={setQ} placeholder="Sök märke, plagg eller medlem" placeholderTextColor="#8f8c86" style={styles.searchInput} returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} />
+          <TextInput value={input} onChangeText={setInput} placeholder="Sök märke, plagg eller medlem" placeholderTextColor="#8f8c86" style={styles.searchInput} returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} autoCapitalize="none" />
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -18, marginBottom: 22 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 7 }}>
-          {FILTERS.map((f) => {
-            const on = filter === f;
-            return (
-              <Pressable key={f} onPress={() => setFilter(on ? null : f)} style={[styles.filter, on && styles.filterOn]}>
-                <Text style={{ fontSize: 14.5, color: on ? '#fff' : C.ink }}>{f}{on ? ` · ${HINT[f]}` : ''}</Text>
-                <Icon name="chev" size={9} color={on ? '#fff' : C.ink} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -18, marginBottom: open ? 10 : 22 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 7 }}>
+          {pill(f.size ? `Storlek ${f.size}` : 'Storlek', !!f.size, () => setOpen(open === 'size' ? null : 'size'))}
+          {pill(f.condition ?? 'Skick', !!f.condition, () => setOpen(open === 'cond' ? null : 'cond'))}
+          {pill(f.sort === 'price' ? 'Pris: lägst först' : 'Pris', f.sort === 'price', () => setF((x) => ({ ...x, sort: x.sort === 'price' ? 'new' : 'price' })))}
+        </ScrollView>
+        {open ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 20 }}>
+            {(open === 'size' ? SIZES : CONDS).map((v) => {
+              const key = open === 'size' ? 'size' : 'condition';
+              const on = f[key] === v;
+              return (
+                <Pressable key={v} onPress={() => { setF((x) => ({ ...x, [key]: on ? undefined : v })); setOpen(null); }} style={[styles.opt, on && styles.filterOn]}>
+                  <Text style={{ fontSize: 14, color: on ? '#fff' : C.ink }}>{v}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {people.length ? (
+          <View style={{ marginBottom: 22 }}>
+            <Text style={[styles.h3, { marginBottom: 10 }]}>Medlemmar</Text>
+            {people.map((p) => (
+              <Pressable key={p.id} style={styles.person} onPress={() => router.push(`/user/${p.id}`)}>
+                <Avatar profile={p} size={40} />
+                <View><Text style={{ fontSize: 15.5, fontWeight: '600', color: C.ink }}>{p.name}</Text><Text style={{ color: C.muted }}>@{p.handle}</Text></View>
               </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Text style={styles.h3} numberOfLines={1}>{f.q.trim() ? `Resultat för ”${f.q.trim()}”` : 'Till salu nu'}</Text>
+          {f.q.trim() ? null : <Icon name="check" size={18} color={C.accent} />}
+        </View>
+        {res.isLoading ? <Loading /> : null}
+        <View style={styles.grid}>
+          {items.map((x) => {
+            const saved = !!saves.data?.has(x.id);
+            return (
+              <View key={x.id} style={{ width: colW }}>
+                <Pressable onPress={() => openItem(x)}>
+                  <View style={{ width: colW, height: colW * 1.07, borderRadius: 4, overflow: 'hidden', marginBottom: 10, backgroundColor: C.chip }}>
+                    {x.media[0] ? <MediaView media={x.media[0]} active={focused} /> : null}
+                    {x.media[0]?.type === 'video' ? <VideoBadge /> : null}
+                  </View>
+                  <Text style={styles.brand} numberOfLines={1}>{x.brand}</Text>
+                  <Text style={styles.name} numberOfLines={1}>{x.title}</Text>
+                  <Text style={styles.name}>{kr(x.price ?? 0)}</Text>
+                </Pressable>
+                <Pressable style={styles.heart} accessibilityLabel={saved ? 'Ta bort från sparade' : 'Spara'} onPress={() => { toggleSave.mutate({ id: x.id, on: !saved }); toast(saved ? 'Borttagen från sparade' : 'Sparad'); }}>
+                  <Icon name="heart" size={17} filled={saved} />
+                </Pressable>
+              </View>
             );
           })}
-        </ScrollView>
-        <View style={styles.hRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-            <Text style={styles.h3} numberOfLines={1}>{q.trim() ? `Resultat för ”${q.trim()}”` : 'För dig'}</Text>
-            {q.trim() ? null : <Icon name="check" size={18} color={C.accent} />}
-          </View>
         </View>
-        <View style={styles.grid}>
-          {list.map((x) => (
-            <View key={x.id} style={{ width: colW }}>
-              <Pressable onPress={() => router.push(`/listing/${x.id}`)}>
-                <Img source={x.thumb ?? x.images[0]} style={{ width: colW, height: colW * 1.07, borderRadius: 4, marginBottom: 10, backgroundColor: C.chip }} />
-                <Text style={styles.brand}>{x.brand}</Text>
-                <Text style={styles.name}>{x.title}</Text>
-                <Text style={styles.name}>{kr(x.price)}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.heart}
-                accessibilityLabel="Spara"
-                onPress={() => { toggleHeart(x.id); toast(state.hearted[x.id] ? 'Borttagen från favoriter' : 'Sparad i favoriter'); }}
-              >
-                <Icon name="heart" size={17} filled={!!state.hearted[x.id]} />
-              </Pressable>
-            </View>
-          ))}
-          {!list.length ? <Text style={styles.empty}>Inga plagg matchar din sökning.</Text> : null}
-        </View>
+        {!res.isLoading && !items.length ? <Empty title={f.q || f.size || f.condition ? 'Inga plagg matchar' : 'Inga plagg till salu än'} text={f.q || f.size || f.condition ? 'Prova en annan sökning eller ta bort filter.' : 'Lägg ut något ur din garderob så syns det här.'} /> : null}
       </ScrollView>
     </View>
   );
@@ -95,11 +132,11 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16.5, color: C.ink },
   filter: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fff' },
   filterOn: { backgroundColor: C.ink, borderColor: C.ink },
-  hRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  opt: { borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: '#fff' },
   h3: { fontSize: 19, fontWeight: '700', color: C.ink },
+  person: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 13, rowGap: 20 },
   brand: { fontSize: 13, letterSpacing: 1, color: C.muted, textTransform: 'uppercase' },
   name: { fontSize: 15.5, color: C.ink, marginTop: 2 },
   heart: { position: 'absolute', top: 7, right: 7, width: 39, height: 39, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  empty: { color: C.muted, textAlign: 'center', paddingVertical: 40, width: '100%' },
 });

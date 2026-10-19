@@ -2,7 +2,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 export type IconName =
   | 'home' | 'search' | 'plus' | 'chat' | 'user' | 'bell' | 'back' | 'close' | 'heart'
-  | 'bookmark' | 'send' | 'flip' | 'arrow' | 'chev' | 'check' | 'dots' | 'image';
+  | 'bookmark' | 'send' | 'flip' | 'arrow' | 'chev' | 'check' | 'dots' | 'image' | 'play' | 'soundOn' | 'soundOff' | 'trash';
 
 type Props = { name: IconName; size?: number; color?: string; filled?: boolean; strokeWidth?: number };
 
@@ -42,6 +42,14 @@ export function Icon({ name, size = 22, color = '#111', filled = false, strokeWi
       return <Svg width={size} height={size} viewBox="0 0 24 24"><Circle cx="12" cy="12" r="10" fill={color} /><Path d="m7.5 12.3 3 3 6-6.3" fill="none" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" /></Svg>;
     case 'dots':
       return <Svg width={size} height={size} viewBox="0 0 24 24"><Circle cx="5" cy="12" r="1.7" fill={color} /><Circle cx="12" cy="12" r="1.7" fill={color} /><Circle cx="19" cy="12" r="1.7" fill={color} /></Svg>;
+    case 'play':
+      return <Svg width={size} height={size} viewBox="0 0 24 24"><Path d="M7 4.5v15l12.5-7.5z" fill={color} /></Svg>;
+    case 'soundOn':
+      return <Svg width={size} height={size} viewBox="0 0 24 24"><Path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill={color} /><Path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" {...common} /></Svg>;
+    case 'soundOff':
+      return <Svg width={size} height={size} viewBox="0 0 24 24"><Path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill={color} /><Path d="m15.5 9.5 5 5M20.5 9.5l-5 5" {...common} /></Svg>;
+    case 'trash':
+      return <Svg width={size} height={size} viewBox="0 0 24 24"><Path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" {...common} /></Svg>;
     case 'image':
       return <Svg width={size} height={size} viewBox="0 0 24 24"><Rect x="3.5" y="4.5" width="17" height="15" rx="2" {...common} /><Circle cx="9" cy="10" r="1.6" {...common} /><Path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5" {...common} /></Svg>;
   }

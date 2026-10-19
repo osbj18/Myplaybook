@@ -1,56 +1,67 @@
-import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { router, useIsFocused } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '../../components/Icon';
-import { FeedTile } from '../../components/items';
-import { Avatar, IconBtn, Img, Logo, TopBar } from '../../components/ui';
-import { FAVORITES, type Item } from '../../data/seed';
-import { useStore } from '../../store';
+import { ItemTile } from '../../components/items';
+import { MediaView } from '../../components/MediaView';
+import { Avatar, Btn, Empty, IconBtn, Loading, Logo, TopBar } from '../../components/ui';
+import { useFavorites, useFeed, useMyBlocks } from '../../lib/api';
+import type { Item } from '../../lib/types';
 import { C, T } from '../../theme';
 
-function Story({ index, onClose }: { index: number | null; onClose: () => void }) {
-  const { markStory } = useStore();
-  const [i, setI] = useState(index);
-  const p = useRef(new Animated.Value(0)).current;
-  const insets = useSafeAreaInsets();
-  useEffect(() => setI(index), [index]);
-  useEffect(() => {
-    if (i === null) return;
-    markStory(FAVORITES[i].user);
-    p.setValue(0);
-    const a = Animated.timing(p, { toValue: 1, duration: 4000, useNativeDriver: false });
-    a.start(({ finished }) => { if (finished) next(); });
-    return () => a.stop();
-  }, [i]);
-  const next = () => setI((cur) => { if (cur === null || cur + 1 >= FAVORITES.length) { onClose(); return null; } return cur + 1; });
-  if (i === null) return null;
-  const f = FAVORITES[i];
-  return (
-    <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={{ flex: 1, backgroundColor: '#000' }} onPress={next}>
-        <Img source={f.story} style={StyleSheet.absoluteFill} />
-        <View style={[styles.progress, { top: insets.top + 8 }]}>
-          <Animated.View style={{ height: 3, backgroundColor: '#fff', width: p.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
-        </View>
-        <Pressable style={[styles.storyWho, { top: insets.top + 22 }]} onPress={() => { onClose(); router.push(`/user/${f.user}`); }}>
-          <Avatar handle={f.user} size={30} ring />
-          <Text style={styles.storyName}>{f.user}</Text>
-        </Pressable>
-        <IconBtn label="Stäng" onPress={onClose} style={{ position: 'absolute', right: 14, top: insets.top + 20 }}><Icon name="close" color="#fff" size={20} /></IconBtn>
-      </Pressable>
-    </Modal>
-  );
-}
-
 export default function Home() {
-  const { state, item } = useStore();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const [story, setStory] = useState<number | null>(null);
+  const focused = useIsFocused();
+  const feed = useFeed();
+  const favorites = useFavorites();
+  const blocks = useMyBlocks();
+  const [visible, setVisible] = useState<Set<string>>(new Set());
   const tileW = (width - 36 - 7) / 2;
-  const feed = state.feed.map(item).filter((x): x is Item => !!x && !state.blocked[x.owner]);
+
+  const items = (feed.data?.items ?? []).filter((x) => !blocks.data?.has(x.owner_id));
+  const favs = (favorites.data ?? []).filter((f) => !blocks.data?.has(f.profile.id));
+
+  // Spela bara videor som syns på skärmen.
+  const onViewable = useRef(({ viewableItems }: { viewableItems: { item?: unknown }[] }) => {
+    const ids = new Set<string>();
+    viewableItems.forEach((v) => (v.item as Item[] | undefined)?.forEach((it) => ids.add(it.id)));
+    setVisible(ids);
+  }).current;
+
+  const rows: Item[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+
+  const refresh = useCallback(() => { feed.refetch(); favorites.refetch(); }, [feed, favorites]);
+
+  const header = (
+    <View>
+      {favs.length ? (
+        <>
+          <Text style={[T.label, { marginHorizontal: 18, marginTop: 6, marginBottom: 14 }]}>FAVORITER</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18, gap: 9 }}>
+            {favs.map(({ profile, cover }) => (
+              <Pressable key={profile.id} style={{ width: 82 }} onPress={() => router.push(`/user/${profile.id}`)} accessibilityLabel={profile.name}>
+                <View style={styles.fav}>
+                  {cover ? <MediaView media={cover} active={focused} /> : <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}><Avatar profile={profile} size={48} /></View>}
+                </View>
+                <Text numberOfLines={1} style={styles.favName}>{profile.handle}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+      <View style={styles.rowBetween}>
+        <Text style={T.label}>{feed.data?.following ? 'FÖLJER' : 'SENASTE PÅ ARKIV'}</Text>
+        <Pressable onPress={() => router.navigate('/explore')} hitSlop={8}><Text style={styles.seeAll}>SE ALLA ›</Text></Pressable>
+      </View>
+      {!feed.data?.following && items.length ? (
+        <Text style={[T.small, { marginHorizontal: 18, marginTop: -6, marginBottom: 14 }]}>Följ personer du gillar så hamnar deras looks här.</Text>
+      ) : null}
+    </View>
+  );
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: C.bg }}>
@@ -59,37 +70,37 @@ export default function Home() {
         center={<Logo />}
         right={<IconBtn label="Meddelanden" onPress={() => router.navigate('/messages')}><Icon name="chat" /></IconBtn>}
       />
-      <ScrollView contentContainerStyle={{ paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
-        <Text style={[T.label, { marginHorizontal: 18, marginTop: 6, marginBottom: 14 }]}>FAVORITER</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18, gap: 9 }}>
-          {FAVORITES.filter((f) => !state.blocked[f.user]).map((f) => (
-            <Pressable key={f.user} style={{ width: 82 }} onPress={() => setStory(FAVORITES.indexOf(f))} accessibilityLabel={`Story från ${f.user}`}>
-              <Img source={f.img} style={[styles.fav, state.seenStories[f.user] && { opacity: 0.6 }]} />
-              <Text numberOfLines={1} style={styles.favName}>{f.user}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-        <View style={styles.rowBetween}>
-          <Text style={T.label}>FÖLJER</Text>
-          <Pressable onPress={() => router.navigate('/explore')} hitSlop={8}><Text style={styles.seeAll}>SE ALLA ›</Text></Pressable>
-        </View>
-        <View style={styles.grid}>
-          {feed.map((it) => <FeedTile key={it.id} it={it} width={tileW} />)}
-        </View>
-      </ScrollView>
-      <Story index={story} onClose={() => setStory(null)} />
+      <FlatList
+        data={rows}
+        keyExtractor={(r) => r.map((x) => x.id).join('-')}
+        ListHeaderComponent={header}
+        ListEmptyComponent={feed.isLoading ? <Loading /> : (
+          <Empty
+            title="Här är det tomt än"
+            text="Bli först med att dela en look eller lägga ut ett plagg till salu."
+            action={<Btn title="Lägg ut något" onPress={() => router.push('/camera')} />}
+          />
+        )}
+        renderItem={({ item: row }) => (
+          <View style={styles.row}>
+            {row.map((it) => <ItemTile key={it.id} it={it} width={tileW} height={tileW * 1.25} active={focused && visible.has(it.id)} />)}
+          </View>
+        )}
+        onViewableItemsChanged={onViewable}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 55 }}
+        refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={refresh} />}
+        contentContainerStyle={{ paddingBottom: 18 }}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   post: { backgroundColor: C.chip, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16 },
-  fav: { width: 82, height: 137, borderRadius: 6, marginBottom: 7 },
+  fav: { width: 82, height: 137, borderRadius: 6, marginBottom: 7, overflow: 'hidden', backgroundColor: C.chip },
   favName: { fontSize: 12, color: '#333', textAlign: 'center' },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 18, marginTop: 26, marginBottom: 14 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 18, marginTop: 22, marginBottom: 14 },
   seeAll: { color: C.accent, fontSize: 13, fontWeight: '600', letterSpacing: 1.8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 18 },
-  progress: { position: 'absolute', left: 14, right: 14, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,.35)', overflow: 'hidden' },
-  storyWho: { position: 'absolute', left: 16, flexDirection: 'row', alignItems: 'center', gap: 9 },
-  storyName: { color: '#fff', fontWeight: '600', fontSize: 15, textShadowColor: 'rgba(0,0,0,.5)', textShadowRadius: 6 },
+  row: { flexDirection: 'row', gap: 7, paddingHorizontal: 18, marginBottom: 7 },
 });

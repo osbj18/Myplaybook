@@ -1,23 +1,28 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { ScrollViewInstance, TextInputInstance } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ME, type Item, type Sale } from '../data/seed';
-import { kr, useStore } from '../store';
+import { kr, timeAgo, useAddComment, useComments, useDeleteComment, useMyBlocks } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { errorText, toast } from '../lib/toast';
+import type { Item } from '../lib/types';
 import { C, T } from '../theme';
 import { Icon } from './Icon';
-import { Avatar, Btn, Chip, IconBtn, Img, Sheet, useModeration } from './ui';
+import { MediaView, VideoBadge } from './MediaView';
+import { Avatar, Btn, Chip, Loading, Sheet, useModeration } from './ui';
 
-export const openItem = (it: Item) => router.push(it.kind === 'sale' ? `/listing/${it.id}` : `/post/${it.id}`);
+export const openItem = (it: Item) => router.push(`/item/${it.id}`);
 
-export function FeedTile({ it, width }: { it: Item; width: number }) {
+/** Ruta i flöden och rutnät. Videor spelas upp ljudlöst när rutan syns. */
+export function ItemTile({ it, width, height, active, showHandle = true, smallBadge }: { it: Item; width: number; height: number; active: boolean; showHandle?: boolean; smallBadge?: boolean }) {
+  const first = it.media[0];
   return (
-    <Pressable onPress={() => openItem(it)} style={[s.tile, { width, height: width * 1.25 }]} accessibilityLabel={it.kind === 'sale' ? it.title : it.caption}>
-      <Img source={it.thumb ?? it.images[0]} style={StyleSheet.absoluteFill} />
-      {it.kind === 'sale' ? <SaleBadge sold={it.sold} /> : null}
-      <Text style={s.handle}>@{it.owner}</Text>
+    <Pressable onPress={() => openItem(it)} style={[s.tile, { width, height }]} accessibilityLabel={it.kind === 'sale' ? it.title ?? 'Plagg' : it.caption || 'Inlägg'}>
+      {first ? <MediaView media={first} active={active} /> : null}
+      {it.kind === 'sale' ? <SaleBadge sold={it.sold} small={smallBadge} /> : null}
+      {first?.type === 'video' ? <VideoBadge /> : null}
+      {showHandle && it.owner ? <Text style={s.handle} numberOfLines={1}>@{it.owner.handle}</Text> : null}
     </Pressable>
   );
 }
@@ -28,143 +33,91 @@ export const SaleBadge = ({ sold, small }: { sold?: boolean; small?: boolean }) 
   </View>
 );
 
-/** Helskärmsbild med svepbara bilder, avsändare och räknare. */
-export function Hero({ it, height }: { it: Item; height: number }) {
-  const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const { state, toggleHeart, toast } = useStore();
+export function CommentsSheet({ item, visible, onClose }: { item: Item; visible: boolean; onClose: () => void }) {
+  const { userId } = useAuth();
+  const comments = useComments(item.id, visible);
+  const blocks = useMyBlocks();
+  const add = useAddComment(item.id);
+  const del = useDeleteComment(item.id);
   const moderate = useModeration();
-  const [index, setIndex] = useState(0);
-  const n = it.images.length;
-  return (
-    <View style={[s.hero, { height }]}>
-      <FlatList
-        data={it.images}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(x, i) => x + i}
-        onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
-        renderItem={({ item: img }) => <Img source={img} style={{ width, height }} />}
-      />
-      <View style={[s.heroTop, { top: insets.top + 10 }]}>
-        <Pressable style={s.author} onPress={() => router.push(`/user/${it.owner}`)}>
-          <Avatar handle={it.owner} ring />
-          <Text style={s.authorName}>@{it.owner}</Text>
-        </Pressable>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-          {it.kind === 'sale' ? <View style={s.heroBadge}><Text style={{ fontSize: 15, color: C.ink }}>{it.sold ? 'Såld' : 'Säljes'}</Text></View> : null}
-          {it.owner !== ME ? <IconBtn label="Fler val" onPress={() => moderate(it.owner)} style={s.round}><Icon name="dots" color="#fff" size={20} /></IconBtn> : null}
-          <IconBtn label="Stäng" onPress={() => router.back()} style={s.round}><Icon name="close" color="#fff" size={18} /></IconBtn>
-        </View>
-      </View>
-      <View style={s.count}><Text style={s.countText}>{index + 1}/{n}</Text></View>
-      {n > 1 ? (
-        <View style={s.dots}>{it.images.map((_, i) => <View key={i} style={[s.dot, i === index && s.dotOn]} />)}</View>
-      ) : null}
-      {it.kind === 'sale' && it.owner !== ME ? (
-        <Pressable
-          style={s.heartFab}
-          accessibilityLabel="Spara"
-          onPress={() => { toggleHeart(it.id); toast(state.hearted[it.id] ? 'Borttagen från favoriter' : 'Sparad i favoriter'); }}
-        >
-          <Icon name="heart" size={20} filled={!!state.hearted[it.id]} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-export function CommentsSheet({ id, visible, onClose }: { id: string; visible: boolean; onClose: () => void }) {
-  const { state, user, addComment, toggleCommentLike } = useStore();
   const [text, setText] = useState('');
   const input = useRef<TextInputInstance>(null);
   const scroll = useRef<ScrollViewInstance>(null);
-  const list = (state.comments[id] ?? []).filter((c) => !state.blocked[c.user]);
+  const list = (comments.data ?? []).filter((c) => !blocks.data?.has(c.user_id));
+
   const send = () => {
     const v = text.trim();
     if (!v) return;
-    addComment(id, v);
-    setText('');
-    setTimeout(() => scroll.current?.scrollToEnd(), 50);
+    add.mutate(v, {
+      onSuccess: () => { setText(''); setTimeout(() => scroll.current?.scrollToEnd(), 200); },
+      onError: (e) => toast(errorText(e)),
+    });
   };
+
   return (
-    <Sheet visible={visible} onClose={onClose} title={`${list.length + 34} kommentarer`} height="72%">
+    <Sheet visible={visible} onClose={onClose} title={`${list.length} ${list.length === 1 ? 'kommentar' : 'kommentarer'}`} height="72%">
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: 18 }} keyboardShouldPersistTaps="handled">
-        {list.map((c, i) => {
-          const key = id + i;
-          const on = !!state.likedComments[key];
-          const u = user(c.user);
-          return (
-            <View key={key} style={[s.comment, c.reply && { marginLeft: 42 }]}>
-              <Avatar handle={c.user} size={38} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: C.ink }}>
-                  {c.user === 'ameliacmode' || c.user === ME ? c.user : u.name}
-                  <Text style={{ color: C.muted, fontWeight: '400' }}> · {c.creator ? 'Skapare · ' : ''}{c.time}</Text>
-                </Text>
-                <Text style={[T.body, { marginTop: 3, marginBottom: 6 }]}>{c.text}</Text>
-                <Pressable onPress={() => { setText(`@${u.name.split(' ')[0]} `); input.current?.focus(); }}><Text style={{ fontSize: 13.5, color: C.muted }}>Svara</Text></Pressable>
-              </View>
-              <Pressable onPress={() => toggleCommentLike(key)} style={{ alignItems: 'center', paddingTop: 4 }} accessibilityLabel="Gilla kommentar" hitSlop={8}>
-                <Icon name="heart" size={15} color={on ? '#c0392b' : C.muted} filled={on} />
-                <Text style={{ fontSize: 11, color: on ? '#c0392b' : C.muted }}>{c.likes + (on ? 1 : 0) || ''}</Text>
+        {comments.isLoading ? <Loading /> : null}
+        {!comments.isLoading && !list.length ? <Text style={{ color: C.muted, textAlign: 'center', paddingVertical: 30 }}>Bli först att kommentera.</Text> : null}
+        {list.map((c) => (
+          <Pressable
+            key={c.id}
+            style={s.comment}
+            onLongPress={() => c.user && moderate(
+              { user: c.user, commentId: c.id },
+              c.user_id === userId || item.owner_id === userId ? [{ label: 'Ta bort kommentar', destructive: true, onPress: () => del.mutate(c.id) }] : undefined,
+            )}
+          >
+            <Avatar profile={c.user} size={38} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: C.ink }}>
+                {c.user?.handle ?? 'okänd'}
+                <Text style={{ color: C.muted, fontWeight: '400' }}> · {c.user_id === item.owner_id ? 'Skapare · ' : ''}{timeAgo(c.created_at)}</Text>
+              </Text>
+              <Text style={[T.body, { marginTop: 3, marginBottom: 6 }]}>{c.body}</Text>
+              <Pressable onPress={() => { setText(`@${c.user?.handle ?? ''} `); input.current?.focus(); }} hitSlop={6}>
+                <Text style={{ fontSize: 13.5, color: C.muted }}>Svara</Text>
               </Pressable>
             </View>
-          );
-        })}
+          </Pressable>
+        ))}
       </ScrollView>
       <View style={s.foot}>
-        <TextInput ref={input} value={text} onChangeText={setText} onSubmitEditing={send} placeholder="Skriv en kommentar..." placeholderTextColor="#9d9a94" style={s.input} returnKeyType="send" />
-        <Pressable style={s.sendRound} onPress={send} accessibilityLabel="Skicka"><Icon name="send" size={16} color="#fff" /></Pressable>
+        <TextInput ref={input} value={text} onChangeText={setText} onSubmitEditing={send} placeholder="Skriv en kommentar..." placeholderTextColor="#9d9a94" style={s.input} returnKeyType="send" maxLength={500} />
+        <Pressable style={[s.sendRound, add.isPending && { opacity: 0.5 }]} onPress={send} disabled={add.isPending} accessibilityLabel="Skicka"><Icon name="send" size={16} color="#fff" /></Pressable>
       </View>
     </Sheet>
   );
 }
 
-export function DetailsSheet({ it, visible, onClose, onBid }: { it: Sale; visible: boolean; onClose: () => void; onBid: () => void }) {
-  const { state, user, openDm } = useStore();
-  const more = state.items.filter((x): x is Sale => x.owner === it.owner && x.kind === 'sale' && x.id !== it.id && !x.sold).slice(0, 3);
-  const fact = (label: string, value: string) => (
-    <View style={s.fact}><Text style={{ color: C.muted, fontSize: 13, marginBottom: 3 }}>{label}</Text><Text style={{ fontSize: 15, color: C.ink }}>{value}</Text></View>
-  );
+export function DetailsSheet({ it, visible, onClose, onBid, onMessage }: { it: Item; visible: boolean; onClose: () => void; onBid: () => void; onMessage: () => void }) {
+  const { userId } = useAuth();
+  const own = it.owner_id === userId;
   return (
     <Sheet visible={visible} onClose={onClose}>
       <ScrollView contentContainerStyle={{ padding: 18 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={s.h2}>{it.title}</Text><Text style={s.h2}>{kr(it.price)}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+          <Text style={[s.h2, { flex: 1 }]}>{it.title}</Text><Text style={s.h2}>{kr(it.price ?? 0)}</Text>
         </View>
         <Text style={[T.upper, { fontSize: 13 }]}>{it.brand}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 16 }}>
-          <Chip label={`Storlek ${it.size}`} style={{ borderRadius: 6 }} />
-          <Chip label={it.cond} style={{ borderRadius: 6 }} />
-          <Chip label={`Frakt ${it.ship} kr`} style={{ borderRadius: 6 }} />
+          {it.size ? <Chip label={`Storlek ${it.size}`} style={{ borderRadius: 6 }} /> : null}
+          {it.condition ? <Chip label={it.condition} style={{ borderRadius: 6 }} /> : null}
+          {it.shipping ? <Chip label={it.shipping} style={{ borderRadius: 6 }} /> : null}
+          {it.pickup ? <Chip label="Kan hämtas" style={{ borderRadius: 6 }} /> : null}
         </View>
-        <Text style={[T.upper, { marginBottom: 4 }]}>Beskrivning</Text>
-        <Text style={[T.body, { marginBottom: 16 }]}>{it.desc}</Text>
-        <View style={s.facts}>
-          {fact('Material', it.material)}{fact('Mått', it.measure)}{fact('Färg', it.color)}{fact('Upplagd', it.posted)}
-        </View>
-        {more.length ? (
+        {it.caption ? (
           <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-              <Text style={T.upper}>Mer från {user(it.owner).name}</Text>
-              <Pressable onPress={() => { onClose(); router.push(`/user/${it.owner}`); }}><Text style={{ fontSize: 14, color: C.ink }}>Visa alla</Text></Pressable>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 9 }}>
-              {more.map((m) => (
-                <Pressable key={m.id} style={{ flex: 1 }} onPress={() => { onClose(); router.push(`/listing/${m.id}`); }}>
-                  <Img source={m.thumb ?? m.images[0]} style={{ width: '100%', aspectRatio: 1.5, borderRadius: 4, marginBottom: 6 }} />
-                  <Text style={{ fontSize: 15, color: C.ink }}>{kr(m.price)}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <Text style={[T.upper, { marginBottom: 4 }]}>Beskrivning</Text>
+            <Text style={[T.body, { marginBottom: 16 }]}>{it.caption}</Text>
           </>
         ) : null}
+        <Text style={[T.small, { marginBottom: 6 }]}>Upplagd {timeAgo(it.created_at)} av @{it.owner?.handle}</Text>
+        <Text style={[T.small, { lineHeight: 19 }]}>Betalning och frakt gör ni upp direkt med varandra, t.ex. via Swish. Möts gärna upp eller använd spårbar frakt.</Text>
       </ScrollView>
-      {it.owner !== ME ? (
+      {!own ? (
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 18, paddingTop: 8 }}>
-          <Btn title="Meddelande" variant="ghost" style={{ flex: 1 }} onPress={() => { onClose(); router.push(`/chat/${openDm(it.owner, it.id)}`); }} />
+          <Btn title="Meddelande" variant="ghost" style={{ flex: 1 }} onPress={onMessage} />
           <Btn title={it.sold ? 'Såld' : 'Lägg bud'} style={{ flex: 1 }} disabled={it.sold} onPress={onBid} />
         </View>
       ) : null}
@@ -172,18 +125,19 @@ export function DetailsSheet({ it, visible, onClose, onBid }: { it: Sale; visibl
   );
 }
 
-type BidProps = { it: Sale; visible: boolean; onClose: () => void; onSend: (amount: number) => void; title?: string; cta?: string; initial?: number };
-export function BidSheet({ it, visible, onClose, onSend, title = 'Lägg bud', cta = 'Skicka bud', initial }: BidProps) {
-  const suggestions = [0.8, 0.9, 1].map((f) => Math.round((it.price * f) / 10) * 10);
+type BidProps = { price: number; label: string; visible: boolean; onClose: () => void; onSend: (amount: number) => Promise<void>; title?: string; cta?: string; initial?: number };
+export function BidSheet({ price, label, visible, onClose, onSend, title = 'Lägg bud', cta = 'Skicka bud', initial }: BidProps) {
+  const suggestions = [0.8, 0.9, 1].map((f) => Math.round((price * f) / 10) * 10);
   const [amount, setAmount] = useState(String(initial ?? suggestions[1]));
+  const [busy, setBusy] = useState(false);
   useEffect(() => { if (visible) setAmount(String(initial ?? suggestions[1])); }, [visible]);
   const v = parseInt(amount.replace(/\D/g, ''), 10) || 0;
   return (
     <Sheet visible={visible} onClose={onClose} title={title}>
       <View style={{ padding: 18, alignItems: 'center' }}>
-        <Text style={T.small}>{it.title} · {it.brand} · utropspris {kr(it.price)}</Text>
+        <Text style={T.small}>{label} · utropspris {kr(price)}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginVertical: 10 }}>
-          <TextInput value={amount} onChangeText={setAmount} keyboardType="number-pad" style={s.bidInput} accessibilityLabel="Belopp" selectTextOnFocus />
+          <TextInput value={amount} onChangeText={setAmount} keyboardType="number-pad" style={s.bidInput} accessibilityLabel="Belopp" selectTextOnFocus maxLength={7} />
           <Text style={{ fontSize: 28, fontWeight: '600', color: C.ink }}>kr</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
@@ -193,8 +147,41 @@ export function BidSheet({ it, visible, onClose, onSend, title = 'Lägg bud', ct
             </Pressable>
           ))}
         </View>
-        <Text style={[T.small, { textAlign: 'center', marginBottom: 16 }]}>Köparskydd ingår. Du betalar först när säljaren accepterat.</Text>
-        <Btn title={cta} style={{ alignSelf: 'stretch', paddingVertical: 16 }} disabled={!v} onPress={() => { onClose(); onSend(v); }} />
+        <Text style={[T.small, { textAlign: 'center', marginBottom: 16 }]}>Budet är bindande om det accepteras. Betalning görs direkt mellan er.</Text>
+        <Btn
+          title={cta}
+          loading={busy}
+          style={{ alignSelf: 'stretch', paddingVertical: 16 }}
+          disabled={!v}
+          onPress={async () => {
+            setBusy(true);
+            try { await onSend(v); onClose(); } catch (e) { toast(errorText(e)); } finally { setBusy(false); }
+          }}
+        />
+      </View>
+    </Sheet>
+  );
+}
+
+export function ReviewSheet({ visible, onClose, onSend, sellerName }: { visible: boolean; onClose: () => void; onSend: (stars: number, body: string) => Promise<void>; sellerName: string }) {
+  const [stars, setStars] = useState(5);
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  return (
+    <Sheet visible={visible} onClose={onClose} title={`Omdöme om ${sellerName}`}>
+      <View style={{ padding: 18, gap: 14 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Pressable key={n} onPress={() => setStars(n)} hitSlop={6} accessibilityLabel={`${n} stjärnor`}>
+              <Text style={{ fontSize: 34, color: n <= stars ? C.star : '#d6d3cd' }}>★</Text>
+            </Pressable>
+          ))}
+        </View>
+        <TextInput value={body} onChangeText={setBody} placeholder="Hur gick affären?" placeholderTextColor="#9d9a94" multiline maxLength={500} style={[s.input, { borderRadius: 10, minHeight: 90, textAlignVertical: 'top' }]} />
+        <Btn title="Skicka omdöme" loading={busy} onPress={async () => {
+          setBusy(true);
+          try { await onSend(stars, body.trim()); onClose(); toast('Tack för ditt omdöme!'); } catch (e) { toast(errorText(e)); } finally { setBusy(false); }
+        }} />
       </View>
     </Sheet>
   );
@@ -203,26 +190,12 @@ export function BidSheet({ it, visible, onClose, onSend, title = 'Lägg bud', ct
 const s = StyleSheet.create({
   tile: { borderRadius: 6, overflow: 'hidden', backgroundColor: C.chip },
   badge: { position: 'absolute', top: 9, left: 7, backgroundColor: '#fff', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
-  handle: { position: 'absolute', left: 8, bottom: 7, color: '#fff', fontSize: 13.5, textShadowColor: 'rgba(0,0,0,.5)', textShadowRadius: 6 },
-  hero: { backgroundColor: '#222', overflow: 'hidden', borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
-  heroTop: { position: 'absolute', left: 16, right: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  author: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  authorName: { color: '#fff', fontWeight: '600', fontSize: 16, textShadowColor: 'rgba(0,0,0,.4)', textShadowRadius: 8 },
-  heroBadge: { backgroundColor: '#fff', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 16 },
-  round: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,.3)' },
-  count: { position: 'absolute', left: 14, bottom: 14, backgroundColor: 'rgba(40,40,40,.6)', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
-  countText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  dots: { position: 'absolute', bottom: 22, alignSelf: 'center', flexDirection: 'row', gap: 5 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,.55)' },
-  dotOn: { width: 18, backgroundColor: '#fff' },
-  heartFab: { position: 'absolute', right: 14, bottom: 14, width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  handle: { position: 'absolute', left: 8, right: 8, bottom: 7, color: '#fff', fontSize: 13.5, textShadowColor: 'rgba(0,0,0,.5)', textShadowRadius: 6 },
   comment: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   foot: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 18, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line },
   input: { flex: 1, backgroundColor: C.chip, borderRadius: 999, paddingVertical: 13, paddingHorizontal: 18, fontSize: 15.5, color: C.ink },
   sendRound: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
   h2: { fontSize: 21, fontWeight: '600', color: C.ink, marginBottom: 2 },
-  facts: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 22 },
-  fact: { width: '48.5%', backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 7, paddingVertical: 10, paddingHorizontal: 12 },
   bidInput: { width: 190, height: 60, fontSize: 46, fontWeight: '600', textAlign: 'right', color: C.ink, padding: 0 },
   quick: { backgroundColor: C.chip, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 13, borderWidth: 1, borderColor: 'transparent' },
 });

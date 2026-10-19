@@ -1,6 +1,7 @@
 import { ProfileView } from '../../components/Profile';
-import { ME } from '../../data/seed';
+import { useMe } from '../../lib/auth';
 
 export default function MyProfile() {
-  return <ProfileView handle={ME} />;
+  const { uid } = useMe();
+  return <ProfileView id={uid} />;
 }

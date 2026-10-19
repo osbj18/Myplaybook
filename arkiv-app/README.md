@@ -1,103 +1,109 @@
 # ARKIV – iPhone-app
 
-Det sociala flödet för mode – där varje look går att köpa. Byggd med Expo (React Native) och Expo Router.
+Det sociala flödet för mode – där varje look går att köpa. Byggd med Expo (React Native) och Supabase.
 
-## Vad som finns i appen
+Allt i appen är på riktigt: konton, profiler, inlägg, bilder, videor, kommentarer, följare, chatt, bud och omdömen sparas i din Supabase-databas och delas mellan alla användare. Appen innehåller ingen exempeldata – den är tom tills folk börjar lägga upp saker.
 
-- **Hem** – favoriter som stories och flödet från de du följer
-- **Inlägg** – svepbara bilder, gilla, spara och kommentera
-- **Säljes** – plaggsida med detaljer, "Mer från säljaren" och bud
-- **Utforska** – sök och filtrera plagg, spara favoriter
-- **Meddelanden** – chatt med bud, motbud och avslutad affär
-- **Skapa** – riktig kamera och bildväljare (flera bilder), formulär för inlägg eller annons
-- **Profil** – rutnät med filter, omdömen, redigera profil
-- **Inställningar** – blockerade användare och "Radera all min data"
-- **Rapportera/blockera** på inlägg, profiler och chattar (krävs av App Store för användarinnehåll)
+## Funktioner
 
-All data sparas lokalt på telefonen (AsyncStorage). Tagna och valda bilder kopieras till appens dokumentmapp.
+- **Inloggning** med engångskod via e-post (inget lösenord), och lösenord för testkonton
+- **Profil** med användarnamn, bild, stad och bio, följare, omdömen och radering av konto
+- **Hem** med favoriter (de du följer) och flödet. **Videor spelas automatiskt, ljudlöst och i loop** när de syns på skärmen, så man direkt ser att det är en video.
+- **Inlägg** med flera bilder/videor, gilla, spara, kommentarer och ljud på/av för video
+- **Säljes** med titel, märke, pris, storlek, skick och leverans, samt **Lägg bud**
+- **Meddelanden** i realtid med bud, motbud och accepterad affär. Plagget markeras som sålt automatiskt.
+- **Omdömen** som köparen lämnar efter en avslutad affär
+- **Kamera** för foto och video (max 30 sek), eller flera bilder/videor från biblioteket
+- **Utforska** med sökning på plagg, märken och medlemmar, plus filter
+- **Rapportera, blockera och användarvillkor**, som App Store kräver för appar med användarinnehåll
 
-## Kör lokalt
+Säkerheten ligger i databasen (Row Level Security). Man kan bara ändra sitt eget innehåll, bara läsa sina egna konversationer, och bud kan bara accepteras av mottagaren.
+
+---
+
+## Steg 1 – Skapa databasen (Supabase, gratis)
+
+1. Skapa ett konto på https://supabase.com och klicka **New project**. Välj region **Stockholm (eu-north-1)** om den finns, annars Frankfurt.
+2. Gå till **SQL Editor → New query**. Klistra in hela innehållet i [`supabase/schema.sql`](supabase/schema.sql) och klicka **Run**.
+3. Gå till **Authentication → Sign In / Providers → Email**. Se till att *Email* är på och att *Confirm email* är på.
+4. Gå till **Authentication → Emails → Templates → Magic Link** och byt texten mot nedanstående, så att mejlet innehåller en kod:
+
+   ```html
+   <h2>Din kod till ARKIV</h2>
+   <p>Ange den här koden i appen:</p>
+   <p style="font-size:28px;letter-spacing:6px"><strong>{{ .Token }}</strong></p>
+   ```
+
+   Gör samma sak med mallen **Confirm signup**.
+5. **Viktigt för riktiga testare:** Supabases inbyggda e-post skickar bara ett fåtal mejl per timme. Koppla en egen e-posttjänst under **Authentication → Emails → SMTP Settings**. [Resend](https://resend.com) är gratis upp till 3 000 mejl/månad.
+6. Gå till **Project Settings → API** och kopiera **Project URL** och **anon public key**.
+
+## Steg 2 – Koppla appen
+
+Skapa filen `arkiv-app/.env`. Utgå från `.env.example`:
+
+```
+EXPO_PUBLIC_SUPABASE_URL=https://ditt-projekt.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=din-anon-public-nyckel
+```
+
+Anon-nyckeln är gjord för att ligga i appen. Säkerheten sköts av reglerna i databasen. Lägg **aldrig** in `service_role`-nyckeln här.
+
+## Steg 3 – Testa på din iPhone
+
+Appen använder kamera och video och behöver därför en egen testversion. Expo Go räcker inte.
 
 ```bash
 npm install
-npx expo start
-```
-
-Skanna QR-koden med kameran på din iPhone. Du behöver appen **Expo Go**, eller en development build eftersom appen använder kameran.
-
-## Ladda upp till App Store
-
-Du behöver:
-
-1. Ett **Apple Developer-konto** (99 USD/år): https://developer.apple.com/programs/
-2. Ett gratis **Expo-konto**: https://expo.dev/signup
-
-Ingen Mac behövs, eftersom bygget sker i molnet med EAS.
-
-### 1. Välj ditt bundle-ID
-
-I `app.json` står `"bundleIdentifier": "se.arkiv.app"`. Byt till ett unikt ID som du äger, till exempel `se.dittnamn.arkiv`. ID:t går inte att ändra efter den första uppladdningen.
-
-### 2. Bygg appen
-
-```bash
 npx eas-cli@latest login
-npx eas-cli@latest init          # kopplar projektet till ditt Expo-konto
-npm run build:ios                # bygger en .ipa i molnet
+npx eas-cli@latest init
+npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest submit --platform ios --latest
 ```
 
-EAS frågar efter ditt Apple-konto och skapar certifikat och provisioning-profiler automatiskt.
+Efter någon timme finns appen i **TestFlight**. Där kan du bjuda in upp till 10 000 testare via e-post eller en publik länk. Det är det smidigaste sättet att låta riktiga användare testa innan lanseringen.
 
-### 3. Skicka till App Store Connect
+Du behöver ett **Apple Developer-konto** (99 USD/år) och ett gratis **Expo-konto**. Ingen Mac behövs.
 
-```bash
-npm run submit:ios
-```
+> Byt först `bundleIdentifier` i `app.json` (`se.arkiv.app`) till ett unikt ID du äger, t.ex. `se.dittnamn.arkiv`. Det går inte att ändra efter första uppladdningen.
 
-Bygget hamnar i **TestFlight** efter några minuter. Där kan du testa appen på din egen iPhone.
+## Steg 4 – Skicka in till App Store
 
-### 4. Fyll i App Store Connect
-
-Gör det här på https://appstoreconnect.apple.com:
+I App Store Connect behöver du:
 
 - **Skärmdumpar** för 6,9" iPhone (1320 × 2868), minst 3 st
-- **Beskrivning**, nyckelord och kategori (t.ex. *Livsstil* eller *Shopping*)
-- **Länk till integritetspolicy** (krävs)
-- **App Privacy**: "Data Not Collected" stämmer för nuvarande version, eftersom inget lämnar telefonen
-- **Åldersgräns**: svara ja på "User Generated Content"
-- Klicka **Submit for Review**
+- **Beskrivning**, nyckelord och kategori (*Livsstil* eller *Shopping*)
+- **Integritetspolicy** – en länk till en webbsida (kan vara en enkel sida, t.ex. på Notion)
+- **App Privacy**: appen samlar in *E-postadress*, *Namn*, *Foton/videor* och *Annat användarinnehåll*, kopplat till användaren och inte för spårning
+- **Åldersgräns**: svara ja på *User Generated Content*
+- **Inloggning för granskaren**: skapa en användare i Supabase (**Authentication → Users → Add user**) med e-post och lösenord. Skriv in uppgifterna under *App Review Information*. Granskaren loggar in via "Logga in med lösenord".
+- Lägg gärna upp några egna inlägg först, så att granskaren ser en levande app.
 
-## Viktigt inför granskningen
+## Moderering
 
-Den här versionen har exempelinnehåll och fungerar helt på telefonen. Den har inga konton, ingen server och inga riktiga betalningar. Apple brukar avvisa marknadsplats- och sociala appar där andra användare och köp bara är på låtsas (riktlinje 2.1 och 4.2).
+Anmälningar hamnar i tabellen `reports` i Supabase (**Table Editor → reports**). Apple kräver att de hanteras inom 24 timmar. Ta bort innehåll som bryter mot reglerna i `items` eller `comments`, och vid behov användaren under **Authentication → Users**.
 
-Inför en riktig lansering behövs:
-
-- Konton och inloggning, med "Logga in med Apple" och radering av konto i appen
-- En backend för inlägg, bilder, chatt och bud (t.ex. Supabase eller Firebase)
-- Betalning för fysiska varor via t.ex. Stripe eller Swish. Apples köp i appen ska *inte* användas för fysiska varor.
-- Granskning av rapporterat innehåll inom 24 timmar
+---
 
 ## Kodstruktur
 
 ```
-src/app/            skärmar (Expo Router, filbaserad routing)
-  (tabs)/           Hem, Utforska, Skapa, Meddelanden, Profil
-  post/[id]         inlägg
-  listing/[id]      plagg till salu
-  chat/[id]         konversation med bud
-  user/[handle]     annan användares profil
-  camera, compose   skapa-flödet
-  settings          inställningar
-src/components/     återanvändbara komponenter (ark, ikoner, profil)
-src/data/           exempeldata och bildregister
-src/store.tsx       app-state, sparas i AsyncStorage
-src/photos.ts       sparar bilder i appens dokumentmapp
+supabase/schema.sql   tabeller, säkerhetsregler, bud-logik, lagring
+src/app/              skärmar (Expo Router)
+  login, onboarding   inloggning och skapa profil
+  (tabs)/             Hem, Utforska, Skapa, Meddelanden, Profil
+  item/[id]           inlägg eller plagg till salu
+  chat/[id]           konversation med bud
+  user/[id]           annan användares profil
+  camera, compose     fota/filma och publicera
+  settings, terms     inställningar och användarvillkor
+src/components/       återanvändbara delar (MediaView spelar video)
+src/lib/              Supabase-klient, inloggning, API, uppladdning
 ```
 
 ## Kontroller
 
 ```bash
 npm run typecheck
-npx expo export --platform web   # snabb kontroll att allt bundlar
+npx expo export --platform web
 ```

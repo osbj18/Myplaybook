@@ -51,8 +51,8 @@
         "expo-camera",
         {
           "cameraPermission": "ARKIV använder kameran så att du kan fota plagg och outfits som du lägger ut.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "ARKIV använder mikrofonen när du filmar videor till dina inlägg.",
+          "recordAudioAndroid": true,
           "barcodeScannerEnabled": false
         }
       ],
@@ -61,11 +61,12 @@
         {
           "photosPermission": "ARKIV behöver tillgång till dina bilder så att du kan välja foton till inlägg och annonser.",
           "cameraPermission": "ARKIV använder kameran så att du kan fota plagg och outfits som du lägger ut.",
-          "microphonePermission": false
+          "microphonePermission": "ARKIV använder mikrofonen när du filmar videor till dina inlägg."
         }
       ],
       "expo-font",
-      "expo-image"
+      "expo-image",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false

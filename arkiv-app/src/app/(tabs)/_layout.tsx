@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '../../components/Icon';
-import { useStore } from '../../store';
+import { useMyBlocks, useThreads } from '../../lib/api';
 import { C } from '../../theme';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
@@ -17,8 +17,9 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
 
 function TabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { state: s } = useStore();
-  const unread = s.threads.some((t) => t.unread && !s.blocked[t.with]);
+  const threads = useThreads();
+  const blocks = useMyBlocks();
+  const unread = (threads.data ?? []).some((t) => t.unread && !blocks.data?.has(t.last_sender_id ?? ''));
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {state.routes.map((route, i) => {
