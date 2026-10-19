@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "ARKIV",
+    "slug": "arkiv",
+    "scheme": "arkiv",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#f8f7f4",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "se.arkiv.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDevelopmentRegion": "sv",
+        "CFBundleLocalizations": [
+          "sv"
+        ]
+      }
+    },
+    "android": {
+      "package": "se.arkiv.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#f8f7f4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "backgroundColor": "#f8f7f4"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ARKIV använder kameran så att du kan fota plagg och outfits som du lägger ut.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ARKIV behöver tillgång till dina bilder så att du kan välja foton till inlägg och annonser.",
+          "cameraPermission": "ARKIV använder kameran så att du kan fota plagg och outfits som du lägger ut.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-font",
+      "expo-image"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

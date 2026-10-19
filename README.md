@@ -10,6 +10,12 @@ En samling enkla Python-program för olika ändamål. Nedan hittar du beskrivnin
 
 ---
 
+## ARKIV – iPhone-app för App Store (arkiv-app/)
+
+Den riktiga appen, byggd med Expo (React Native). Den har kamera, bildväljare och lokal lagring, och kan byggas och laddas upp till App Store utan Mac via EAS. Se [arkiv-app/README.md](arkiv-app/README.md) för steg-för-steg-instruktioner.
+
+---
+
 ## ARKIV – klickbar app-prototyp (arkiv/)
 
 Det sociala flödet för mode – där varje look går att köpa. En klickbar webbprototyp byggd efter designen "ARKIV v3" och pitchvideon. Ren HTML, CSS och JavaScript, inga beroenden.
