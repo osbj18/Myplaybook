@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f7f4">
+  <title>ARKIV</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="stage">
+    <aside class="pitch">
+      <p class="eyebrow">ARKIV</p>
+      <h1>Det sociala flödet för mode — där varje look går att köpa.</h1>
+      <p>Dela outfits. Följ stilen. Sälj second hand. I samma app.</p>
+      <ul>
+        <li><b>Hem</b> Favoriter överst, de du följer under.</li>
+        <li><b>Inlägg</b> Bilden i fokus. Svep mellan bilder, gilla och spara.</li>
+        <li><b>Säljes</b> Se plagget och lägg bud direkt.</li>
+        <li><b>Meddelanden</b> Bud, motbud och affär i samma tråd.</li>
+        <li><b>Skapa</b> Fota, välj typ och lägg ut till salu.</li>
+        <li><b>Profil</b> Varje profil är en butik — med omdömen.</li>
+      </ul>
+      <button class="reset" type="button" id="reset">Återställ demo</button>
+    </aside>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="app" id="app">
+        <div class="statusbar" id="statusbar">
+          <span class="time">9:41</span>
+          <span class="sys">
+            <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="6" rx="1"/><rect x="10" y="2.5" width="3" height="8.5" rx="1"/><rect x="15" y="0" width="3" height="11" rx="1"/></svg>
+            <svg width="26" height="12" viewBox="0 0 26 12"><rect x=".75" y=".75" width="22" height="10.5" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="3" width="17.5" height="6" rx="1.6"/><rect x="24" y="4" width="1.6" height="4" rx=".8"/></svg>
+          </span>
+        </div>
+        <main class="screen" id="screen"></main>
+        <nav class="tabbar" id="tabbar"></nav>
+        <div class="layer" id="layer"></div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <div class="homebar"></div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

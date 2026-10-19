@@ -10,6 +10,33 @@ En samling enkla Python-program för olika ändamål. Nedan hittar du beskrivnin
 
 ---
 
+## ARKIV – klickbar app-prototyp (arkiv/)
+
+Det sociala flödet för mode – där varje look går att köpa. En klickbar webbprototyp byggd efter designen "ARKIV v3" och pitchvideon. Ren HTML, CSS och JavaScript, inga beroenden.
+
+### Så här kör du prototypen:
+
+Öppna `arkiv/index.html` i en webbläsare, eller starta en lokal server:
+
+```bash
+cd arkiv
+python -m http.server 8000
+```
+
+Gå sedan till http://localhost:8000. På datorn visas appen i en telefonram, och på mobilen fyller den hela skärmen.
+
+### Det här går att göra
+
+- **Hem** – favoriter (tryck för story) och flödet från de du följer
+- **Inlägg** – svep eller tryck mellan bilder, gilla, spara och kommentera
+- **Säljes** – se plagget, öppna detaljer och lägg bud
+- **Utforska** – sök på märke, plagg eller medlem, filtrera och spara favoriter
+- **Meddelanden** – bud, motbud och accepterad affär i samma tråd (säljaren svarar automatiskt i demon)
+- **Skapa** – kamera med lägen, kamerarulle med flerval och formulär för att lägga ut ett plagg till salu
+- **Profil** – rutnät med filter (Alla / Säljes / Inlägg), följ-knapp och omdömen
+
+---
+
 ## Transaktionsanalys (transaktion_analys.py)
 
 Ett program för att analysera och summera ekonomiska transaktioner, inklusive insättningar, uttag och statistik.
