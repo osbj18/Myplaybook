@@ -35,14 +35,9 @@ function AutoVideo({ media, style, active, soundToggle }: { media: Media; style?
   return (
     <View style={[StyleSheet.absoluteFill, style]}>
       {media.poster ? <Img path={media.poster} style={StyleSheet.absoluteFill} /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1a1a1a' }]} />}
-      <VideoView
-        player={player}
-        style={[StyleSheet.absoluteFill, { opacity: isPlaying ? 1 : 0 }]}
-        contentFit="cover"
-        nativeControls={false}
-        allowsPictureInPicture={false}
-        pointerEvents="none"
-      />
+      <View style={[StyleSheet.absoluteFill, { opacity: isPlaying ? 1 : 0 }]} pointerEvents="none">
+        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} />
+      </View>
       {soundToggle ? (
         <Pressable onPress={() => setMuted((m) => !m)} style={styles.sound} accessibilityLabel={muted ? 'Slå på ljud' : 'Stäng av ljud'} hitSlop={8}>
           <Icon name={muted ? 'soundOff' : 'soundOn'} size={18} color="#fff" />

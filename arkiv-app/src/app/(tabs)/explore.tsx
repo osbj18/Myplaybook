@@ -1,13 +1,14 @@
 import { router, useIsFocused } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '../../components/Icon';
 import { openItem } from '../../components/items';
 import { MediaView, VideoBadge } from '../../components/MediaView';
+import { buildBlocks, MosaicBlock, type Block } from '../../components/Mosaic';
 import { Avatar, Empty, IconBtn, Loading, Logo, TopBar } from '../../components/ui';
-import { kr, useExplore, useMyBlocks, useMySaves, useToggleSave, type ExploreFilter } from '../../lib/api';
+import { kr, useDiscover, useExplore, useMyBlocks, useMySaves, useToggleSave, type ExploreFilter } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { toast } from '../../lib/toast';
 import { C } from '../../theme';
@@ -38,6 +39,16 @@ export default function Explore() {
   const items = (res.data?.items ?? []).filter((x) => !blocks.data?.has(x.owner_id) && x.owner_id !== userId);
   const people = (res.data?.people ?? []).filter((p) => !blocks.data?.has(p.id) && p.id !== userId);
 
+  // Utan sökning visas ett rutnät som Instagram Utforska, med videor som höga rutor.
+  const browsing = !f.q.trim() && !f.size && !f.condition && f.sort !== 'price' && !input.trim();
+  const discover = useDiscover();
+  const discoverItems = useMemo(() => (discover.data ?? []).filter((x) => !blocks.data?.has(x.owner_id) && x.owner_id !== userId), [discover.data, blocks.data, userId]);
+  const mosaic = useMemo(() => buildBlocks(discoverItems), [discoverItems]);
+  const [visible, setVisible] = useState<Set<string>>(new Set());
+  const onViewable = useRef(({ viewableItems }: { viewableItems: { item?: unknown }[] }) => {
+    setVisible(new Set(viewableItems.map((v) => (v.item as Block).key)));
+  }).current;
+
   const pill = (label: string, on: boolean, onPress: () => void) => (
     <Pressable key={label} onPress={onPress} style={[styles.filter, on && styles.filterOn]}>
       <Text style={{ fontSize: 14.5, color: on ? '#fff' : C.ink }}>{label}</Text>
@@ -52,18 +63,24 @@ export default function Explore() {
         center={<Logo />}
         right={<IconBtn label="Meddelanden" onPress={() => router.navigate('/messages')}><Icon name="bell" /></IconBtn>}
       />
-      <ScrollView
+      <FlatList
+        data={browsing ? mosaic : []}
+        keyExtractor={(b) => b.key}
+        renderItem={({ item: b }) => <MosaicBlock block={b} width={width} visible={focused && visible.has(b.key)} all={discoverItems} />}
+        onViewableItemsChanged={onViewable}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 24 }}
-        refreshControl={<RefreshControl refreshing={res.isRefetching} onRefresh={() => { res.refetch(); }} />}
-      >
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={<RefreshControl refreshing={res.isRefetching || discover.isRefetching} onRefresh={() => { res.refetch(); discover.refetch(); }} />}
+        ListEmptyComponent={browsing && discover.isLoading ? <Loading /> : browsing ? <Empty title="Inget att utforska än" text="Lägg upp en look eller en video så syns den här." /> : undefined}
+        ListHeaderComponent={<View style={{ paddingHorizontal: 18 }}>
         <Text style={styles.title}>Upptäck</Text>
         <View style={styles.search}>
           <Icon name="search" size={14} color="#777" />
           <TextInput value={input} onChangeText={setInput} placeholder="Sök märke, plagg eller medlem" placeholderTextColor="#8f8c86" style={styles.searchInput} returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} autoCapitalize="none" />
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -18, marginBottom: open ? 10 : 22 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 7 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -18, marginBottom: open ? 10 : browsing ? 14 : 22 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 7 }}>
           {pill(f.size ? `Storlek ${f.size}` : 'Storlek', !!f.size, () => setOpen(open === 'size' ? null : 'size'))}
           {pill(f.condition ?? 'Skick', !!f.condition, () => setOpen(open === 'cond' ? null : 'cond'))}
           {pill(f.sort === 'price' ? 'Pris: lägst först' : 'Pris', f.sort === 'price', () => setF((x) => ({ ...x, sort: x.sort === 'price' ? 'new' : 'price' })))}
@@ -82,6 +99,7 @@ export default function Explore() {
           </View>
         ) : null}
 
+        {browsing ? null : (<>
         {people.length ? (
           <View style={{ marginBottom: 22 }}>
             <Text style={[styles.h3, { marginBottom: 10 }]}>Medlemmar</Text>
@@ -121,7 +139,9 @@ export default function Explore() {
           })}
         </View>
         {!res.isLoading && !items.length ? <Empty title={f.q || f.size || f.condition ? 'Inga plagg matchar' : 'Inga plagg till salu än'} text={f.q || f.size || f.condition ? 'Prova en annan sökning eller ta bort filter.' : 'Lägg ut något ur din garderob så syns det här.'} /> : null}
-      </ScrollView>
+        </>)}
+        </View>}
+      />
     </View>
   );
 }

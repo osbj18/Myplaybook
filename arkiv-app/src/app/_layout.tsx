@@ -47,6 +47,7 @@ function Root() {
         <Stack.Protected guard={hasProfile}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="item/[id]" />
+          <Stack.Screen name="reels" options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
           <Stack.Screen name="chat/[id]" />
           <Stack.Screen name="user/[id]" />
           <Stack.Screen name="settings" />

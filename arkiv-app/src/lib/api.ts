@@ -126,6 +126,14 @@ export function useFavorites() {
   });
 }
 
+/** Senaste från alla, för Utforska-rutnätet. */
+export function useDiscover() {
+  return useQuery({
+    queryKey: ['discover'],
+    queryFn: async () => (await run(supabase.from('items').select(ITEM_SELECT).order('created_at', { ascending: false }).limit(90))) as Item[],
+  });
+}
+
 export type ExploreFilter = { q: string; size?: string; condition?: string; sort?: 'new' | 'price' };
 export function useExplore(f: ExploreFilter) {
   return useQuery({
@@ -172,7 +180,7 @@ export function useCreateItem() {
   const { userId } = useAuth();
   return useMutation({
     mutationFn: async (n: NewItem) => (await run(supabase.from('items').insert({ owner_id: userId, ...n }).select('id').single())) as { id: string },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['feed'] }); qc.invalidateQueries({ queryKey: ['userItems'] }); qc.invalidateQueries({ queryKey: ['explore'] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['feed'] }); qc.invalidateQueries({ queryKey: ['userItems'] }); qc.invalidateQueries({ queryKey: ['explore'] }); qc.invalidateQueries({ queryKey: ['discover'] }); },
   });
 }
 
@@ -183,7 +191,7 @@ export function useDeleteItem() {
       await run(supabase.from('items').delete().eq('id', it.id));
       await deleteMediaFiles(it.media).catch(() => {});
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['feed'] }); qc.invalidateQueries({ queryKey: ['userItems'] }); qc.invalidateQueries({ queryKey: ['explore'] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['feed'] }); qc.invalidateQueries({ queryKey: ['userItems'] }); qc.invalidateQueries({ queryKey: ['explore'] }); qc.invalidateQueries({ queryKey: ['discover'] }); },
   });
 }
 

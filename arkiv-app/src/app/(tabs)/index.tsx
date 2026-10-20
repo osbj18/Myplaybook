@@ -1,14 +1,13 @@
 import { router, useIsFocused } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '../../components/Icon';
-import { ItemTile } from '../../components/items';
 import { MediaView } from '../../components/MediaView';
+import { buildBlocks, MosaicBlock, type Block } from '../../components/Mosaic';
 import { Avatar, Btn, Empty, IconBtn, Loading, Logo, TopBar } from '../../components/ui';
 import { useFavorites, useFeed, useMyBlocks } from '../../lib/api';
-import type { Item } from '../../lib/types';
 import { C, T } from '../../theme';
 
 export default function Home() {
@@ -19,20 +18,16 @@ export default function Home() {
   const favorites = useFavorites();
   const blocks = useMyBlocks();
   const [visible, setVisible] = useState<Set<string>>(new Set());
-  const tileW = (width - 36 - 7) / 2;
 
-  const items = (feed.data?.items ?? []).filter((x) => !blocks.data?.has(x.owner_id));
+  const items = useMemo(() => (feed.data?.items ?? []).filter((x) => !blocks.data?.has(x.owner_id)), [feed.data, blocks.data]);
   const favs = (favorites.data ?? []).filter((f) => !blocks.data?.has(f.profile.id));
 
-  // Spela bara videor som syns på skärmen.
+  // Spela bara videor i block som syns på skärmen.
   const onViewable = useRef(({ viewableItems }: { viewableItems: { item?: unknown }[] }) => {
-    const ids = new Set<string>();
-    viewableItems.forEach((v) => (v.item as Item[] | undefined)?.forEach((it) => ids.add(it.id)));
-    setVisible(ids);
+    setVisible(new Set(viewableItems.map((v) => (v.item as Block).key)));
   }).current;
 
-  const rows: Item[][] = [];
-  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  const blocksList = useMemo(() => buildBlocks(items), [items]);
 
   const refresh = useCallback(() => { feed.refetch(); favorites.refetch(); }, [feed, favorites]);
 
@@ -71,8 +66,8 @@ export default function Home() {
         right={<IconBtn label="Meddelanden" onPress={() => router.navigate('/messages')}><Icon name="chat" /></IconBtn>}
       />
       <FlatList
-        data={rows}
-        keyExtractor={(r) => r.map((x) => x.id).join('-')}
+        data={blocksList}
+        keyExtractor={(b) => b.key}
         ListHeaderComponent={header}
         ListEmptyComponent={feed.isLoading ? <Loading /> : (
           <Empty
@@ -81,13 +76,9 @@ export default function Home() {
             action={<Btn title="Lägg ut något" onPress={() => router.push('/camera')} />}
           />
         )}
-        renderItem={({ item: row }) => (
-          <View style={styles.row}>
-            {row.map((it) => <ItemTile key={it.id} it={it} width={tileW} height={tileW * 1.25} active={focused && visible.has(it.id)} />)}
-          </View>
-        )}
+        renderItem={({ item: b }) => <MosaicBlock block={b} width={width} visible={focused && visible.has(b.key)} all={items} />}
         onViewableItemsChanged={onViewable}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 55 }}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
         refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={refresh} />}
         contentContainerStyle={{ paddingBottom: 18 }}
         showsVerticalScrollIndicator={false}
@@ -102,5 +93,4 @@ const styles = StyleSheet.create({
   favName: { fontSize: 12, color: '#333', textAlign: 'center' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 18, marginTop: 22, marginBottom: 14 },
   seeAll: { color: C.accent, fontSize: 13, fontWeight: '600', letterSpacing: 1.8 },
-  row: { flexDirection: 'row', gap: 7, paddingHorizontal: 18, marginBottom: 7 },
 });
