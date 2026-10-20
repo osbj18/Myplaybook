@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
+import { isDemo } from './demo';
 import { isConfigured, supabase } from './supabase';
 import type { Profile } from './types';
 
@@ -34,8 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isConfigured) return;
     supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      await loadProfile(data.session?.user.id);
+      let s = data.session;
+      // Testläget loggar in på testkontot direkt.
+      if (!s && isDemo) s = (await supabase.auth.signInWithPassword({ email: 'du@testlage.se', password: 'test' })).data.session;
+      setSession(s);
+      await loadProfile(s?.user.id);
       setReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {

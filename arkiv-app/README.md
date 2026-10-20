@@ -85,6 +85,10 @@ Anmälningar hamnar i tabellen `reports` i Supabase (**Table Editor → reports*
 
 ---
 
+## Testläge (förhandsversion)
+
+`npm run preview:web` bygger en webbversion där en låtsasserver i minnet ersätter Supabase. Den har några exempelprofiler, inlägg och videor och loggar in på ett testkonto direkt. Den är bara till för att klicka runt och visa appen. Inget sparas, och App Store-bygget påverkas inte (testläget slås bara på med `EXPO_PUBLIC_DEMO=1`).
+
 ## Kodstruktur
 
 ```

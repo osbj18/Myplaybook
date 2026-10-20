@@ -4,15 +4,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
+import { demoFetch, demoUrl, isDemo, memoryStorage } from './demo';
+
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 /** Sant när appen har nycklar till ett Supabase-projekt (se README). */
-export const isConfigured = /^https:\/\/.+/.test(url) && anonKey.length > 20;
+export const isConfigured = isDemo || (/^https:\/\/.+/.test(url) && anonKey.length > 20);
 
-export const supabase = createClient(isConfigured ? url : 'https://example.supabase.co', isConfigured ? anonKey : 'public-anon-key', {
+const real = !isDemo && isConfigured;
+export const supabase = createClient(real ? url : 'https://testlage.arkiv.app', real ? anonKey : 'testlage-anon-key', {
+  global: isDemo ? { fetch: demoFetch } : undefined,
   auth: {
-    storage: AsyncStorage,
+    storage: isDemo ? memoryStorage : AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
@@ -28,4 +32,4 @@ if (Platform.OS !== 'web') {
 }
 
 export const BUCKET = 'media';
-export const publicUrl = (path?: string | null) => (path ? supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl : undefined);
+export const publicUrl = (path?: string | null) => (!path ? undefined : isDemo ? demoUrl(path) : supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl);

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { useAuth } from './auth';
+import { isDemo } from './demo';
 import { deleteAllFiles, deleteMediaFiles } from './media';
 import { supabase } from './supabase';
 import type { Comment, Item, Media, Message, Profile, Review, Tag, Thread } from './types';
@@ -267,6 +268,7 @@ export function useThreads() {
   const q = useQuery({
     queryKey: ['threads', userId],
     enabled: !!userId,
+    refetchInterval: isDemo ? 2000 : false,
     queryFn: async () => {
       const [threads, reads] = await Promise.all([
         run(supabase.from('threads').select(THREAD_SELECT).order('updated_at', { ascending: false }).limit(200)),
@@ -281,7 +283,7 @@ export function useThreads() {
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || isDemo) return;
     const ch = supabase
       .channel(`threads-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'threads' }, () => qc.invalidateQueries({ queryKey: ['threads'] }))
@@ -296,9 +298,11 @@ export function useMessages(threadId: string) {
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ['messages', threadId],
+    refetchInterval: isDemo ? 1500 : false,
     queryFn: async () => (await run(supabase.from('messages').select('*').eq('thread_id', threadId).order('created_at').limit(500))) as Message[],
   });
   useEffect(() => {
+    if (isDemo) return;
     const ch = supabase
       .channel(`messages-${threadId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `thread_id=eq.${threadId}` }, () => {
